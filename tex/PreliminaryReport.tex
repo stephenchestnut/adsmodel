@@ -1,0 +1,162 @@
+%MUST COMPILE USING -shell-escape COMMAND LINE SWITCH
+\documentclass[letterpaper,10pt]{article}
+\usepackage{amsmath,amsfonts,amsthm,amssymb}
+\usepackage{pgf}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{python}
+\usepackage{rotating}
+\pagestyle{empty}
+
+%\addtolength{\oddsidemargin}{-.875in}
+%\addtolength{\evensidemargin}{-.875in}
+%\addtolength{\textwidth}{1.75in}
+\addtolength{\topmargin}{-.875in}
+\addtolength{\textheight}{1.75in}
+
+\pgfplotsset{compat=1.7}
+
+\begin{document}
+
+% \begin{tikzpicture}
+% \filldraw[color=brown!30] (-.1,0) -- plot[smooth]
+% coordinates{(0.75000, -0)(1.50000, -1)(2.99095, -2)(5.48875,
+% -3)(8.69300, -4)(11.85084, -5)(14.18633, -6)(15.23492, -7)(14.92679,
+% -8)(13.51834, -9)(11.44620, -10)(9.15468, -11)(6.97724,
+% -12)(5.10472, -13)(3.60818, -14)(2.47848, -15)(1.66351,
+% -16)(1.09630, -17)(0.71238, -18)(0.45801, -19)(0.29215,
+% -20)(0.18528, -21)(0.11701, -22)(0.07367, -23)(0.04628,
+% -24)(0.02903, -25)(0.01819, -26)(0.01139, -27)(0.00713,
+% -28)(0.00446, -29)(0.00279, -30) };
+
+% \filldraw[color=blue!80] (0,0) -- plot[smooth]
+% coordinates{(2,0)(5,-12)(0,-15)};
+% \end{tikzpicture}
+
+% \begin{tikzpicture}[]
+% \begin{axis}[]
+% \addplot[color=blue,fill] {x^2+2} \closedcycle;
+% \end{axis}
+% \end{tikzpicture}
+
+% \begin{tikzpicture}[]
+% \begin{axis}[]
+% \addplot [color=blue!70,fill] coordinates {(1, 13094)
+% (1, 12041)
+% (2, 11655)
+% (3, 11243)
+% (4, 11176)
+% (5, 10787)
+% (6, 11224)
+% (7, 10971)
+% (8, 10848)
+% (9, 11072)}
+% \closedcycle;
+% \end{axis}
+% \end{tikzpicture}
+
+\title{Advertising Network Optimization}
+\author{Stephen Chestnut and Rico Zenklusen}
+
+\maketitle
+\section{Problem Description}
+
+Given a set of businesses $\{1,2,\ldots,n\}$ our goal is to optimize the distribution of advertisements across an advertising network.  Each day the businesses in the network may publish ads for other businesses in the network and place ads to be published by other businesses.  Every business $i$ maintains an account with the network, its value denoted $A_i$ is denominated in ads, and has a has a daily publishing limit $p_i\geq0$.
+
+At the end of each day the total number of ads placed by business $i$ is deducted from its account $A_i$, and at the start of each day the business purchases $a_i$ ads and receives one ad to its account for every two that it published on the preceding day.  
+
+Furthermore, advertisements are not all of the same quality.  Each business has five prefered publishers and a list of excluded advertisers (e.g. competing businesses for whom it will not publish ads).  Let $P=\{(i,j): j$ is a prefered publisher for $i\}$ be the set of prefered ad placements and $S = \{(i,j): j$ will not publish ads for $i\}$ be the set of excluded ad placements.
+
+Let $x_{ij}^{(t)}$ denote the number of advertisements for business $i$ that are published by business $j$ on day $t\geq1$.  Letting $A_{i}^{(t)}$ denote the account balance of business $i$ at the start of day $t$, we initialize $A_{i}^{(0)} = 0$, for all $i$, and the balances are determined by the recursion
+\[A_{i}^{(t)} = A_{i}^{(t-1)} +a_i -\sum_{j}x_{ij}^{(t-1)} + \frac{1}{2}\sum_{j} x_{ji}^{(t-1)}.\]
+
+For each day $t$ we solve a continuous relaxation of the assignment problem to deterimne the values of $x_{ij}^{(t)}$.  The relaxation is 
+\begin{align*}
+\max & \sum_{i,j} c_{ij}x_{ij}^{(t)}\\
+&\text{such that}  \\
+& \sum_{i} x_{ij}^{(t)} \leq p_j,\text{ for all }j,\\
+& \sum_{j} x_{ij}^{(t)} \leq A_{i}^{(t)} + p_i,\text{ for all }i,\\
+& x_{ij}^{(t)} \leq \frac{1}{2}p_j,\text{ for all }i,j,\\
+& x_{ij}^{(t)} = 0,\text{ for all }(i,j)\in S,\\
+&x_{ij}^{(t)}\geq0,\text{ for all }i,j,
+\end{align*}
+where the objective function is $c_{ij} = 2$ for $(i,j)\in P$ or $c_{ij}=(1+distance(i,j))^{-1}$ otherwise.
+
+The objective functions emphasizes the value of prefered ads and de-emphasizes ads between businesses in different neighborhoods.  The constraints express, in order, the maximum number of ads a business may publish, the maximum number of ads a business may place for other businesses to publish, at most half of the ads a business publishes may come from one advertiser, no excluded ads may be published, and all numbers of ads are nonnegative.
+
+\section{Simulation}
+We implemented the network design described in the previous section in Python using the commercially available Gurobi Optimizer to solve the relaxation.  The following sequence of plots and tables describes the solutions during the first (simulated) year of its operation.
+
+Here are the highlights:
+\begin{enumerate}
+\item The steady-state number of ads published is determined by the the fraction, call it $\alpha$, of each ad that its publisher keeps (currently $\alpha = 1/2$) and by the number of ads purchased, $\sum_{i}a_i$.  The steady-state average number of ads, neglecting publishing constraints, is $\frac{1}{1-\alpha}\sum_{i}a_i$.
+\item For the given trial data, around 90\% or more of the advertisements are prefered ads.  The remainder are distance 0, i.e. published by a business in the advertiser's neighborhood.
+\end{enumerate}
+
+\begin{python}
+import sys
+sys.path.append('../src')
+import advertiser
+import py2latex
+
+num_days = 1000 #max number of days to compute
+
+#% x=range(6)
+#% Y=[[ ii for ii in x] for jj in range(5)]
+#% top,bot = py2latex.tikzpicture_caps()
+#% print top + py2latex.tikz_segmented_fill_plot(x,Y) + bot
+
+def prepare_table(t,label='',caption=''):
+    t = py2latex.sideways_headers(t)
+    tstr = py2latex.tabular(t,hline=True)
+    top,bot = py2latex.sidewaystable_caps('\\tiny')
+    tstr = top + py2latex.float_label_caption(label,caption) + tstr + bot
+    return tstr
+
+def prepare_stacked_figure(x,Y,label='',caption=''):
+    figstr,figbot = py2latex.figure_caps('',label,caption)
+    tikztop,tikzbot = py2latex.tikzpicture_caps()
+    figstr += tikztop
+
+    legend = ['prefered']
+    for ii in range(0,len(Y)-1):
+        legend += ['distance ' + str(ii)]
+    figstr += py2latex.pgf_stacked_area_plot(x,Y,legend,[0,max(max(Y))*1.1],['width=5in'])
+    figstr += tikzbot +figbot
+    return figstr
+
+adex = advertiser.AdExchange.from_sample_data(quiet=True)
+hist = advertiser.AdHistory()
+hist.save(adex)
+
+caption = 'Advertising (left) and publishing (top) activity on day '
+label = 'tab:day'
+tables = prepare_table(adex.report_solution_table(),label+'1',caption+'1') + '\n\\newpage\n'
+
+for ii in range(2,11):
+    adex.update()
+    hist.save(adex)
+    tables += prepare_table(adex.report_solution_table(),label+str(ii),caption+str(ii)) + '\n\\newpage\n'
+
+x= range(1,len(hist)+1)
+Y = hist.report_detailed_ads()
+
+fig1 = prepare_stacked_figure(x,Y,'fig:10days','Quality of ads published during the first 10 days')
+
+for ii in range(10,num_days+1):
+    adex.update()
+    hist.save(adex)
+    if ii in [30,90,180,365]:
+        tables += prepare_table(adex.report_solution_table(),label+str(ii),caption+str(ii)) + '\n\\newpage\n'
+
+x= range(1,len(hist)+1)
+Y = hist.report_detailed_ads()
+
+fig2 = prepare_stacked_figure(x,Y,'fig:1yr','Quality of ads published during the first 1000 days')
+
+print fig1
+print fig2
+print tables
+\end{python}
+
+\end{document}
